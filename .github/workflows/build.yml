@@ -1,60 +1,67 @@
-name: Android Build APK  
-  
-# Запуск на push или pull request в любую ветку  
-on:  
-  push:  
-    branches:  
-      - '**'   # любая ветка  
-  pull_request:  
-    branches:  
-      - '**'  
-  
-jobs:  
-  build:  
-    runs-on: ubuntu-latest  
-  
-    steps:  
-      # 1. Клонируем репозиторий  
-      - name: Checkout repository  
-        uses: actions/checkout@v3  
-  
-      # 2. Устанавливаем JDK (Java) и Android SDK  
-      - name: Set up JDK  
-        uses: actions/setup-java@v3  
-        with:  
-          distribution: 'temurin'  
-          java-version: '17'  
-  
-      - name: Set up Android SDK  
-        uses: android-actions/setup-android@v2  
-        with:  
-          api-level: 34  
-          build-tools: '34.0.0'  
-          ndk: '25.2.9519653'  
-  
-      # 3. Кэш Gradle и зависимости  
-      - name: Cache Gradle  
-        uses: actions/cache@v3  
-        with:  
-          path: |  
-            ~/.gradle/caches  
-            ~/.gradle/wrapper/  
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}  
-          restore-keys: gradle-${{ runner.os }}-  
-  
-      # 4. Сборка APK  
-      - name: Build APK  
-        run: ./gradlew assembleRelease  
-  
-      # 5. Поиск APK в проекте  
-      - name: Find APK  
-        run: |  
-          echo "Looking for APK..."  
-          find . -type f -name "*.apk"  
-  
-      # 6. Сохраняем APK как артефакт  
-      - name: Upload APK  
-        uses: actions/upload-artifact@v4  
-        with:  
-          name: android-apk  
+name: Android Build APK
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Клонируем репозиторий
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Устанавливаем JDK 17
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # 3. Устанавливаем Android SDK через sdkmanager
+      - name: Install Android SDK & Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip tar lib32stdc++6 lib32z1
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+          mkdir -p $HOME/Android/cmdline-tools
+          unzip cmdline-tools.zip -d $HOME/Android/cmdline-tools
+          echo "ANDROID_SDK_ROOT=$HOME/Android" >> $GITHUB_ENV
+          echo "$HOME/Android/cmdline-tools/tools/bin" >> $GITHUB_PATH
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653"
+
+      # 4. Кэш Gradle
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper/
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      # 5. Делаем gradlew исполняемым
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew   # или ./android/gradlew если gradlew в папке android
+
+      # 6. Сборка APK
+      - name: Build APK
+        run: ./gradlew assembleRelease   # или ./android/gradlew assembleRelease
+
+      # 7. Поиск APK
+      - name: Find APK
+        run: find . -type f -name "*.apk"
+
+      # 8. Сохраняем APK как артефакт
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
           path: '**/build/outputs/**/*.apk'
